@@ -1,0 +1,16 @@
+.installed.cfg
+bin
+develop-eggs
+dist
+downloads
+eggs
+parts
+*.egg-info
+lib
+lib64
+*.pyc
+*.pyo
+swagger_codegen
+swagger_server
+venv
+api.yml
