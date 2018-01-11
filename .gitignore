@@ -14,3 +14,4 @@ swagger_codegen
 swagger_server
 venv
 api.yml
+.readme.md

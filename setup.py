@@ -1,7 +1,7 @@
 from setuptools import setup
 
 setup(name='codegenit',
-      version='1.2',
+      version='1.5',
       description='Generate a python project from a swagger file.',
       url='http://github.com/cidrblock/codegenit',
       author='Bradley A. Thornton',
@@ -12,7 +12,8 @@ setup(name='codegenit',
       ],
       install_requires=[
         'pygments',
-        'astor'
+        'astor',
+        'colorama'
       ],
       entry_points={
         'console_scripts': [

@@ -36,8 +36,9 @@ After the initial run, the project can be started:
 python3 -m venv venv
 source venv/bin/activate
 pip install codegenit
-wget https://raw.githubusercontent.com/OAI/OpenAPI-Specification/master/examples/v2.0/yaml/petstore.yaml
+wget --output-document api.yml https://raw.githubusercontent.com/OAI/OpenAPI-Specification/master/examples/v2.0/yaml/petstore.yaml
 mv petstore.yaml api.yml
+codegenit --check
 codegenit
 ```
 
@@ -46,6 +47,7 @@ codegenit
 ```
 $ codegenit --help
 usage: codegenit [-h] [-c CODEGEN_DIR] [-p PROJECT_DIR] [-s SWAGGER_FILE]
+                 [--check]
 
 Generate a python project from a swagger file.
 
@@ -57,6 +59,7 @@ optional arguments:
                         A folder in which to place the codegend project. (default: ./)
   -s SWAGGER_FILE, --swagger_file SWAGGER_FILE
                         A folder in which to place the codegend project. (default ./api.yml)
+  --check               Run in check mode, no changes to PROJECT_DIR (except trailing whitespace removal)
 ```
 
 ### Sample run

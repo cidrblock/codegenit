@@ -1,3 +1,5 @@
+import copy
+
 import astor
 import ast
 import os
@@ -19,7 +21,7 @@ class Dyad(object):
         self.src = src
         self.dst = dst
 
-    def copy_file(self, filen, clobber=False):
+    def copy_file(self, filen, clobber=False, check_mode=False):
         source = "%s/%s" % (self.src.directory, filen)
         destination = "%s/%s" % (self.dst.directory, filen)
         try:
@@ -27,10 +29,11 @@ class Dyad(object):
         except OSError:
             clobber = True
         if clobber:
-            shutil.copy(source, destination)
+            if not check_mode:
+                shutil.copy(source, destination)
             PrintInColor.message(color='YELLOW', action="created", string=destination)
 
-    def update_directory(self, directory, clobber=False):
+    def update_directory(self, directory, clobber=False, check_mode=False):
         """ update a directory from src to dst
 
         Args:
@@ -42,28 +45,35 @@ class Dyad(object):
         destination = "%s/%s" % (self.dst.directory, directory)
         if clobber:
             try:
-                shutil.rmtree(destination)
+                if not check_mode:
+                    shutil.rmtree(destination)
                 PrintInColor.message(color='YELLOW', action="deleted", string=destination)
             except OSError:
                 pass
-            shutil.copytree(source, destination)
+            if not check_mode:
+                shutil.copytree(source, destination)
             PrintInColor.message(color='YELLOW', action="updated", string=destination)
         else:
             try:
                 os.stat(destination)
             except OSError:
                 PrintInColor.message(color='YELLOW', action="created", string=destination)
-                os.mkdir(destination)
+                if not check_mode:
+                    os.mkdir(destination)
             for filen in os.listdir(source):
                 if os.path.isfile("%s/%s" % (source, filen)):
                     try:
                         os.stat("%s/%s" % (destination, filen))
-                        update_file(source=source, destination=destination, filen=filen)
+                        update_file(source=source, destination=destination,
+                                    filen=filen, check_mode=check_mode)
                     except OSError:
-                        PrintInColor.message(color='YELLOW', action="created", string="%s/%s" % (destination, filen))
-                        shutil.copy("%s/%s" % (source, filen), "%s/%s" % (destination, filen))
+                        if not check_mode:
+                            shutil.copy("%s/%s" % (source, filen), "%s/%s" % (destination, filen))
+                        PrintInColor.message(color='YELLOW', action="created",
+                                             string="%s/%s" % (destination, filen))
 
-def update_file(source, destination, filen):
+
+def update_file(source, destination, filen, check_mode):
     """ update a python file
 
     Args:
@@ -74,7 +84,6 @@ def update_file(source, destination, filen):
     """
     source_tree = astor.code_to_ast.parse_file("%s/%s" % (source, filen))
     destination_tree = astor.code_to_ast.parse_file("%s/%s" % (destination, filen))
-    dst_changed = False
     for src_entry in source_tree.body:
         match = False
         for dst_entry in destination_tree.body:
@@ -84,21 +93,26 @@ def update_file(source, destination, filen):
         if not match:
             if isinstance(src_entry, ast.Import):
                 destination_tree = handle_import(filen, destination_tree, src_entry)
-                dst_changed = True
             elif isinstance(src_entry, ast.ImportFrom):
                 destination_tree = handle_import_from(filen, destination_tree, src_entry)
-                dst_changed = True
             elif isinstance(src_entry, ast.FunctionDef):
-                destination_tree, dst_changed = handle_function_def(filen,
-                                                                    destination_tree,
-                                                                    src_entry)
+                destination_tree = handle_function_def(filen,
+                                                       destination_tree,
+                                                       src_entry)
             else:
                 PrintInColor.message(color='RED', action="unhandled", string=filen)
                 print("-> %s" % astor.to_source(src_entry))
-    if dst_changed:
-        destination_tree = sort_defs(destination_tree)
-        with open("%s/%s" % (destination, filen), 'w') as fh:
-            fh.write(astor.to_source(destination_tree))
+
+    destination_tree = sort_defs(destination_tree)
+    destination_contents = astor.to_source(destination_tree)
+    with open("%s/%s" % (destination, filen)) as fileh:
+        source_contents = fileh.read()
+    if source_contents != destination_contents:
+        PrintInColor.message(color='YELLOW', action="updated", string="%s/%s" % (destination, filen))
+        PrintInColor.diff(left=source_contents, right=destination_contents)
+        if not check_mode:
+            with open("%s/%s" % (destination, filen), 'w') as fh:
+                fh.write(destination_contents)
     else:
         PrintInColor.message(color='GREEN', action="unmodified", string="%s/%s" % (destination, filen))
 
@@ -111,8 +125,6 @@ def handle_import(filen, destination_tree, src_entry):
         src_entry (ast node): An ast node found missing from the destination_tree
 
     """
-    PrintInColor.message(color='YELLOW', action="updated", string=filen)
-    print("SRC-> %s" % astor.to_source(src_entry))
     destination_tree.body.insert(0, src_entry)
     return destination_tree
 
@@ -129,17 +141,10 @@ def handle_import_from(filen, destination_tree, src_entry):
     for i, dst_entry in enumerate(destination_tree.body):
         if isinstance(dst_entry, ast.ImportFrom):
             if dst_entry.module == src_entry.module:
-                PrintInColor.message(color='YELLOW', action="updated", string=filen)
-                print("SRC-> %s" % astor.to_source(src_entry))
-                print("DST-> %s" % astor.to_source(dst_entry))
                 destination_tree.body[i] = src_entry
                 modified_import_from = True
-                dst_changed = True
     if not modified_import_from:
         destination_tree.body.insert(0, src_entry)
-        PrintInColor.message(color='YELLOW', action="updated", string=filen)
-        print("SRC-> %s" % astor.to_source(src_entry))
-        dst_changed = True
     return destination_tree
 
 def handle_function_def(filen, destination_tree, src_entry):
@@ -159,40 +164,23 @@ def handle_function_def(filen, destination_tree, src_entry):
                 found_by_name = True
                 if astor.to_source(dst_entry.args) != astor.to_source(src_entry.args):
                     PrintInColor.message(color='RED', action="discrepancy", string=filen)
-                    print("DEF-> %s" % src_entry.name)
-                    print("----SRC----")
-                    PrintInColor.code(string=astor.to_source(src_entry.args))
-                    print("----DST----")
-                    PrintInColor.code(string=astor.to_source(dst_entry.args))
-                    dst_changed = False
+                    log_src = copy.copy(src_entry)
+                    log_src.body = []
+                    log_dst = copy.copy(dst_entry)
+                    log_dst.body = []
+                    PrintInColor.diff(left=astor.to_source(log_src),
+                                      right=astor.to_source(log_dst),
+                                      fromfile="Codegen package",
+                                      tofile="Project")
                 elif astor.to_source(dst_entry.body[0]) != astor.to_source(src_entry.body[0]):
                     if isinstance(src_entry.body[0], ast.Expr):
                         if isinstance(dst_entry.body[0], ast.Expr):
-                            PrintInColor.message(color='YELLOW', action="updated", string=filen)
-                            print("DEF-> %s (docstring updated)" % src_entry.name)
-                            print("----SRC----")
-                            PrintInColor.code(string=astor.to_source(src_entry.body[0]))
-                            print("----DST----")
-                            PrintInColor.code(string=astor.to_source(dst_entry.body[0]))
                             destination_tree.body[i].body[0] = src_entry.body[0]
-                            dst_changed = True
                         else:
-                            PrintInColor.message(color='YELLOW', action="updated", string=filen)
-                            print("DEF-> %s (docstring added)" % src_entry.name)
-                            print("----SRC----")
-                            PrintInColor.code(string=astor.to_source(src_entry.body[0]))
                             destination_tree.body[i].body.insert(0, src_entry.body[0])
-                            dst_changed = True
-                else:
-                    PrintInColor.message(color='YELLOW', action="unmodified", string="(different) %s/%s" % (filen, src_entry.name))
-
     if not found_by_name:
         destination_tree.body.append(src_entry)
-        PrintInColor.message(color='YELLOW', action="updated", string=filen)
-        print("----SRC----")
-        PrintInColor.code(string=astor.to_source(src_entry))
-        dst_changed = True
-    return destination_tree, dst_changed
+    return destination_tree
 
 def sort_defs(destination_tree):
     defs = []
@@ -201,5 +189,11 @@ def sort_defs(destination_tree):
             defs.append(destination_tree.body[i])
             destination_tree.body.pop(i)
     defs = sorted(defs, key=lambda k: k.name)
-    destination_tree.body.extend(defs)
+    added = False
+    for i in range(len(destination_tree.body)):
+        if not isinstance(destination_tree.body[i], ast.Import) and not isinstance(destination_tree.body[i], ast.ImportFrom):
+            destination_tree.body[i:i] = defs
+            added = True
+    if not added:
+        destination_tree.body.extend(defs)
     return destination_tree

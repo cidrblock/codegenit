@@ -6,7 +6,7 @@ class Project(object):
     def __init__(self, directory):
         self.directory = directory
 
-    def make_directory(self, directory, clobber=False):
+    def make_directory(self, directory, clobber=False, check_mode=False):
         new_directory = "%s/%s" % (self.directory, directory)
         try:
             os.stat(new_directory)
@@ -14,7 +14,8 @@ class Project(object):
         except OSError:
             clobber = True
         if clobber:
-            os.mkdir(new_directory)
+            if not check_mode:
+                os.mkdir(new_directory)
             PrintInColor.message(color='YELLOW', action="created", string=new_directory)
 
     def remove_trailing_whitespace(self, directory=None):

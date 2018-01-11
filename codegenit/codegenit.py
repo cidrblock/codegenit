@@ -11,8 +11,6 @@ def parse_args():
             args (namespace): The args
 
     """
-    # pwd = os.path.dirname(os.path.realpath(sys.argv[0]))
-    # pwd = os.path.dirname(os.path.abspath(__file__))
     pwd = os.getcwd()
     parser = ArgumentParser(description='Generate a python project from a swagger file.',
                             formatter_class=RawTextHelpFormatter)
@@ -29,6 +27,9 @@ def parse_args():
                         required=False,
                         help="A folder in which to place the codegend project. (default ./api.yml)",
                         default="%s/api.yml" % pwd)
+    parser.add_argument('--check', action="store_true", dest="check_mode",
+                        required=False,
+                        help="Run in check mode, no changes to PROJECT_DIR (except trailing whitespace removal)")
 
     args = parser.parse_args()
     return args
@@ -40,18 +41,26 @@ def main():
     codegen_package.generate()
 
     current_project = Project(directory=args.project_dir)
-    current_project.make_directory(directory='swagger_server', clobber=False)
+    current_project.make_directory(directory='swagger_server',
+                                   clobber=False,
+                                   check_mode=args.check_mode)
     current_project.remove_trailing_whitespace()
 
     codegen_project = Project(directory=codegen_package.directory)
     codegen_project.remove_trailing_whitespace()
 
     dyad = Dyad(src=codegen_project, dst=current_project)
-    dyad.copy_file(filen='requirements.txt', clobber=False)
-    dyad.update_directory(directory='swagger_server', clobber=False)
-    dyad.update_directory(directory='swagger_server/swagger', clobber=True)
-    dyad.update_directory(directory='swagger_server/models', clobber=True)
-    dyad.update_directory(directory='swagger_server/controllers', clobber=False)
+    dyad.copy_file(filen='requirements.txt', clobber=False, check_mode=args.check_mode)
+    dyad.update_directory(directory='swagger_server', clobber=False, check_mode=args.check_mode)
+    dyad.update_directory(directory='swagger_server/swagger',
+                          clobber=True,
+                          check_mode=args.check_mode)
+    dyad.update_directory(directory='swagger_server/models',
+                          clobber=True,
+                          check_mode=args.check_mode)
+    dyad.update_directory(directory='swagger_server/controllers',
+                          clobber=False,
+                          check_mode=args.check_mode)
 
 if __name__ == '__main__':
     main()
