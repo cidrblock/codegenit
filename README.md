@@ -4,6 +4,11 @@ codegenit is a development tool for use with "Specification First REST APIs"
 
 Given a OpenAPI specification file (fka swagger) a skeleton server stub project is created. On subsequent runs, the project will be updated as needed from the newly generated stub project.
 
+#### Requirements
+
+1) python 3.6+
+2) docker
+
 #### First run
 
 1) The CODEGEN_DIR is deleted and a new server stub is created and placed in the CODEGEN_DIR using the swagger codegen docker image (https://hub.docker.com/r/swaggerapi/swagger-codegen-cli/)
@@ -37,7 +42,6 @@ python3 -m venv venv
 source venv/bin/activate
 pip install codegenit
 wget --output-document api.yml https://raw.githubusercontent.com/OAI/OpenAPI-Specification/master/examples/v2.0/yaml/petstore.yaml
-mv petstore.yaml api.yml
 codegenit --check
 codegenit
 ```
