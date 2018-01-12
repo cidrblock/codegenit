@@ -26,9 +26,12 @@ class Project(object):
                 _file_name, file_extension = os.path.splitext(file_name)
                 if file_extension == '.py':
                     path_name = os.path.join(path, file_name)
-                    with open(path_name, 'r') as fh:
-                        new = [line.rstrip() for line in fh]
-                    with open(path_name, 'w') as fh:
-                        [fh.write('%s\n' % line) for line in new]
+                    try:
+                        with open(path_name, 'r') as fh:
+                            new = [line.rstrip() for line in fh]
+                        with open(path_name, 'w') as fh:
+                            [fh.write('%s\n' % line) for line in new]
+                    except UnicodeDecodeError as err:
+                        pass
             for subdir in dirs:
                 self.remove_trailing_whitespace(directory="%s%s" % (path, subdir))
