@@ -50,7 +50,7 @@ codegenit
 ### Usage
 ```
 $ codegenit --help
-usage: codegenit [-h] [-c CODEGEN_DIR] [-p PROJECT_DIR] [-s SWAGGER_FILE]
+usage: codegenit [-h] [-c CODEGEN_DIR] [-p PROJECT_DIR] [-s SWAGGER_FILE] [-u]
                  [--check]
 
 Generate a python project from a swagger file.
@@ -63,7 +63,8 @@ optional arguments:
                         A folder in which to place the codegend project. (default: ./)
   -s SWAGGER_FILE, --swagger_file SWAGGER_FILE
                         A folder in which to place the codegend project. (default ./api.yml)
-  --check               Run in check mode, no changes to PROJECT_DIR (except trailing whitespace removal)
+  -u, --update_args     Update the function arguments in the project_dir. (default: warn only)
+  --check               Run in check mode, no changes to PROJECT_DIR. (except trailing whitespace removal)
 ```
 
 ### Sample run
