@@ -34,7 +34,7 @@ class Dyad(object):
         source = "%s/%s" % (self.src.directory, filen)
         destination = "%s/%s" % (self.dst.directory, filen)
         try:
-            os.stat(source)
+            os.stat(destination)
         except OSError:
             clobber = True
         if clobber:
