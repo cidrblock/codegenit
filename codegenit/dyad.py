@@ -22,6 +22,15 @@ class Dyad(object):
         self.dst = dst
 
     def copy_file(self, filen, clobber=False, check_mode=False):
+        """ Copy a file
+
+        Args:
+
+            filen (str): The name of the file to copy
+            clobber (bool): Clobber the destination
+            check_mode (bool): Perforom or simply log
+
+        """
         source = "%s/%s" % (self.src.directory, filen)
         destination = "%s/%s" % (self.dst.directory, filen)
         try:
@@ -39,6 +48,7 @@ class Dyad(object):
         Args:
             directory (str): The directory to update between the Projects
             clobber (boolean): Nuke the dst before updating
+            check_mode (bool): Perforom or simply log
 
         """
         source = "%s/%s" % (self.src.directory, directory)
@@ -68,7 +78,11 @@ class Dyad(object):
                                     filen=filen, check_mode=check_mode)
                     except OSError:
                         if not check_mode:
-                            shutil.copy("%s/%s" % (source, filen), "%s/%s" % (destination, filen))
+                            source_tree = astor.code_to_ast.parse_file("%s/%s" % (source, filen))
+                            source_tree = sort_defs(source_tree)
+                            destination_contents = astor.to_source(source_tree)
+                            with open("%s/%s" % (destination, filen), 'w') as fileh:
+                                fileh.write(destination_contents)
                         PrintInColor.message(color='YELLOW', action="created",
                                              string="%s/%s" % (destination, filen))
 
@@ -80,6 +94,7 @@ def update_file(source, destination, filen, check_mode):
         source (str): The source directory
         destination (str): The destination directory
         filen (str): The name of the file to be updated
+        check_mode (bool): Perforom or simply log
 
     """
     source_tree = astor.code_to_ast.parse_file("%s/%s" % (source, filen))
@@ -92,13 +107,15 @@ def update_file(source, destination, filen, check_mode):
                 break
         if not match:
             if isinstance(src_entry, ast.Import):
-                destination_tree = handle_import(filen, destination_tree, src_entry)
+                destination_tree = handle_import(destination_tree=destination_tree,
+                                                 src_entry=src_entry)
             elif isinstance(src_entry, ast.ImportFrom):
-                destination_tree = handle_import_from(filen, destination_tree, src_entry)
+                destination_tree = handle_import_from(destination_tree=destination_tree,
+                                                      src_entry=src_entry)
             elif isinstance(src_entry, ast.FunctionDef):
-                destination_tree = handle_function_def(filen,
-                                                       destination_tree,
-                                                       src_entry)
+                destination_tree = handle_function_def(filen=filen,
+                                                       destination_tree=destination_tree,
+                                                       src_entry=src_entry)
             else:
                 PrintInColor.message(color='RED', action="unhandled", string=filen)
                 print("-> %s" % astor.to_source(src_entry))
@@ -108,19 +125,20 @@ def update_file(source, destination, filen, check_mode):
     with open("%s/%s" % (destination, filen)) as fileh:
         source_contents = fileh.read()
     if source_contents != destination_contents:
-        PrintInColor.message(color='YELLOW', action="updated", string="%s/%s" % (destination, filen))
+        PrintInColor.message(color='YELLOW', action="updated",
+                             string="%s/%s" % (destination, filen))
         PrintInColor.diff(left=source_contents, right=destination_contents)
         if not check_mode:
-            with open("%s/%s" % (destination, filen), 'w') as fh:
-                fh.write(destination_contents)
+            with open("%s/%s" % (destination, filen), 'w') as fileh:
+                fileh.write(destination_contents)
     else:
-        PrintInColor.message(color='GREEN', action="unmodified", string="%s/%s" % (destination, filen))
+        PrintInColor.message(color='GREEN', action="unmodified",
+                             string="%s/%s" % (destination, filen))
 
-def handle_import(filen, destination_tree, src_entry):
+def handle_import(destination_tree, src_entry):
     """ Add a missing import statement
 
     Args:
-        filen (str): The nname of the file being modified
         destination_tree (ast): An ast generated from the destination file
         src_entry (ast node): An ast node found missing from the destination_tree
 
@@ -128,11 +146,10 @@ def handle_import(filen, destination_tree, src_entry):
     destination_tree.body.insert(0, src_entry)
     return destination_tree
 
-def handle_import_from(filen, destination_tree, src_entry):
+def handle_import_from(destination_tree, src_entry):
     """ Add or modify a 'from' statement
 
     Args:
-        filen (str): The nname of the file being modified
         destination_tree (ast): An ast generated from the destination file
         src_entry (ast node): An ast node found missing from the destination_tree
 
@@ -157,7 +174,6 @@ def handle_function_def(filen, destination_tree, src_entry):
 
     """
     found_by_name = False
-    dst_changed = False
     for i, dst_entry in enumerate(destination_tree.body):
         if isinstance(dst_entry, ast.FunctionDef):
             if dst_entry.name == src_entry.name:
@@ -183,6 +199,15 @@ def handle_function_def(filen, destination_tree, src_entry):
     return destination_tree
 
 def sort_defs(destination_tree):
+    """ Sort the fns in a tree
+
+    Args:
+        destination_tree (ast): An ast generated from the destination file
+
+    Returns:
+        destination_tree (ast): An ast generated from the destination file
+
+    """
     defs = []
     for i in reversed(range(len(destination_tree.body))):
         if isinstance(destination_tree.body[i], ast.FunctionDef):
@@ -191,7 +216,8 @@ def sort_defs(destination_tree):
     defs = sorted(defs, key=lambda k: k.name)
     added = False
     for i in range(len(destination_tree.body)):
-        if not isinstance(destination_tree.body[i], ast.Import) and not isinstance(destination_tree.body[i], ast.ImportFrom):
+        if (not isinstance(destination_tree.body[i], ast.Import) and
+                not isinstance(destination_tree.body[i], ast.ImportFrom)):
             destination_tree.body[i:i] = defs
             added = True
     if not added:
