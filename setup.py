@@ -1,7 +1,7 @@
 from setuptools import setup
 
 setup(name='codegenit',
-      version='1.6',
+      version='1.7',
       description='Generate a python project from a swagger file.',
       url='http://github.com/cidrblock/codegenit',
       author='Bradley A. Thornton',

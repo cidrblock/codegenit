@@ -21,6 +21,12 @@ class CodegenPackage(object):
         """
         self.directory = directory
         self.swagger_file = swagger_file
+        try:
+            os.stat(swagger_file)
+        except OSError as err:
+            PrintInColor.message(color='RED', action="error", string="%s not found" % swagger_file)
+            print(err)
+            raise
 
     def generate(self):
         """ Generate a codegen package
