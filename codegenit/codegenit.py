@@ -27,9 +27,14 @@ def parse_args():
                         required=False,
                         help="A folder in which to place the codegend project. (default ./api.yml)",
                         default="%s/api.yml" % pwd)
+    parser.add_argument('-u', '--update_args', action="store_true", dest="update_args",
+                        required=False,
+                        help=("Update the function arguments in the project_dir."
+                              " (default: warn only)"))
     parser.add_argument('--check', action="store_true", dest="check_mode",
                         required=False,
-                        help="Run in check mode, no changes to PROJECT_DIR (except trailing whitespace removal)")
+                        help=("Run in check mode, no changes to PROJECT_DIR."
+                              " (except trailing whitespace removal)"))
 
     args = parser.parse_args()
     return args
@@ -60,7 +65,8 @@ def main():
                           check_mode=args.check_mode)
     dyad.update_directory(directory='swagger_server/controllers',
                           clobber=False,
-                          check_mode=args.check_mode)
+                          check_mode=args.check_mode,
+                          update_args=args.update_args)
 
 if __name__ == '__main__':
     main()

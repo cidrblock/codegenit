@@ -42,13 +42,14 @@ class Dyad(object):
                 shutil.copy(source, destination)
             PrintInColor.message(color='YELLOW', action="created", string=destination)
 
-    def update_directory(self, directory, clobber=False, check_mode=False):
+    def update_directory(self, directory, clobber=False, check_mode=False, update_args=False):
         """ update a directory from src to dst
 
         Args:
             directory (str): The directory to update between the Projects
-            clobber (boolean): Nuke the dst before updating
+            clobber (bool): Nuke the dst before updating
             check_mode (bool): Perforom or simply log
+            update_args (bool): Update the args in the dest fn
 
         """
         source = "%s/%s" % (self.src.directory, directory)
@@ -75,7 +76,8 @@ class Dyad(object):
                     try:
                         os.stat("%s/%s" % (destination, filen))
                         update_file(source=source, destination=destination,
-                                    filen=filen, check_mode=check_mode)
+                                    filen=filen, check_mode=check_mode,
+                                    update_args=update_args)
                     except OSError:
                         if not check_mode:
                             source_tree = astor.code_to_ast.parse_file("%s/%s" % (source, filen))
@@ -87,7 +89,7 @@ class Dyad(object):
                                              string="%s/%s" % (destination, filen))
 
 
-def update_file(source, destination, filen, check_mode):
+def update_file(source, destination, filen, check_mode, update_args):
     """ update a python file
 
     Args:
@@ -115,7 +117,8 @@ def update_file(source, destination, filen, check_mode):
             elif isinstance(src_entry, ast.FunctionDef):
                 destination_tree = handle_function_def(filen=filen,
                                                        destination_tree=destination_tree,
-                                                       src_entry=src_entry)
+                                                       src_entry=src_entry,
+                                                       update_args=update_args)
             else:
                 PrintInColor.message(color='RED', action="unhandled", string=filen)
                 print("-> %s" % astor.to_source(src_entry))
@@ -164,7 +167,7 @@ def handle_import_from(destination_tree, src_entry):
         destination_tree.body.insert(0, src_entry)
     return destination_tree
 
-def handle_function_def(filen, destination_tree, src_entry):
+def handle_function_def(filen, destination_tree, src_entry, update_args):
     """ Add or modify a 'def'
 
     Args:
@@ -179,15 +182,18 @@ def handle_function_def(filen, destination_tree, src_entry):
             if dst_entry.name == src_entry.name:
                 found_by_name = True
                 if astor.to_source(dst_entry.args) != astor.to_source(src_entry.args):
-                    PrintInColor.message(color='RED', action="discrepancy", string=filen)
-                    log_src = copy.copy(src_entry)
-                    log_src.body = []
-                    log_dst = copy.copy(dst_entry)
-                    log_dst.body = []
-                    PrintInColor.diff(left=astor.to_source(log_src),
-                                      right=astor.to_source(log_dst),
-                                      fromfile="Codegen package",
-                                      tofile="Project")
+                    if update_args:
+                        dst_entry.args = src_entry.args
+                    else:
+                        log_src = copy.copy(src_entry)
+                        log_src.body = []
+                        log_dst = copy.copy(dst_entry)
+                        log_dst.body = []
+                        PrintInColor.message(color='RED', action="warning", string=filen)
+                        PrintInColor.diff(left=astor.to_source(log_src),
+                                          right=astor.to_source(log_dst),
+                                          fromfile="Codegen package",
+                                          tofile="Project")
                 elif astor.to_source(dst_entry.body[0]) != astor.to_source(src_entry.body[0]):
                     if isinstance(src_entry.body[0], ast.Expr):
                         if isinstance(dst_entry.body[0], ast.Expr):
